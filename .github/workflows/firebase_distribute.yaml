@@ -23,17 +23,15 @@ jobs:
           restore-keys: |
             Library-
 
-      # Unity のライセンス認証（UNITY_LICENSE は Secrets に登録済みとする）
-      - name: Activate Unity License
-        run: echo "${{ secrets.UNITY_LICENSE }}" | base64 --decode > unity.ulf
-
-      # Android 用 APK ビルド
-      - name: Build Android APK
+      - name: Run the build for Android
         uses: game-ci/unity-builder@v4.3.0
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           targetPlatform: Android
-          buildsPath: Build/Android
-          unityLicenseFile: unity.ulf
+          unityVersion: '6000.0.38f1'
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4.6.1
