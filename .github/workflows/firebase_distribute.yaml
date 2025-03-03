@@ -1,0 +1,73 @@
+﻿name: Unity Build and Distribute
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build Unity Project
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - uses: actions/cache@v4.2.0
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      # Android build（カスタムビルドメソッドを指定しない場合）
+      - name: Build Android APK
+        uses: game-ci/unity-builder@v4.3.0
+        with:
+          targetPlatform: Android
+          buildPath: Build/Android
+
+      # iOS build（カスタムビルドメソッドを指定しない場合）
+      - name: Build iOS IPA
+        uses: game-ci/unity-builder@v4.3.0
+        with:
+          targetPlatform: iOS
+          buildPath: Build/iOS
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4.6.1
+        with:
+          name: builds
+          path: |
+            Build/Android/*.apk
+            Build/iOS/*.ipa
+
+  deploy:
+    name: Distribute Builds via Firebase App Distribution
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: builds
+
+      # Firebase CLI の最新 GitHub Action（docker 版）を利用して Android 配布
+      - name: Deploy Android APK via Firebase
+        uses: docker://w9jds/firebase-action:master
+        with:
+          args: "appdistribution:distribute $(find Build/Android -name '*.apk') --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups 'testers' --release-notes 'Automated build release from GitHub Actions'"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      # Firebase CLI の最新 GitHub Action（docker 版）を利用して iOS 配布
+      - name: Deploy iOS IPA via Firebase
+        uses: docker://w9jds/firebase-action:master
+        with:
+          args: "appdistribution:distribute $(find Build/iOS -name '*.ipa') --app ${{ secrets.FIREBASE_IOS_APP_ID }} --groups 'testers' --release-notes 'Automated build release from GitHub Actions'"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
