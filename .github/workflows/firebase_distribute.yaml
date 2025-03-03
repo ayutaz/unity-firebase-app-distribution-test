@@ -1,4 +1,4 @@
-﻿name: Unity Build and Distribute
+﻿name: Unity Build and Distribute (Android Only)
 
 on:
   push:
@@ -8,47 +8,44 @@ on:
 
 jobs:
   build:
-    name: Build Unity Project
+    name: Build Unity Project (Android)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - uses: actions/cache@v4.2.0
+      - name: Cache Unity Library
+        uses: actions/cache@v4.2.0
         with:
           path: Library
           key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-
 
-      # Android build（カスタムビルドメソッドを指定しない場合）
+      # Unity のライセンス認証（UNITY_LICENSE は Secrets に登録済みとする）
+      - name: Activate Unity License
+        run: echo "${{ secrets.UNITY_LICENSE }}" | base64 --decode > unity.ulf
+
+      # Android 用 APK ビルド
       - name: Build Android APK
         uses: game-ci/unity-builder@v4.3.0
         with:
           targetPlatform: Android
-          buildPath: Build/Android
-
-      # iOS build（カスタムビルドメソッドを指定しない場合）
-      - name: Build iOS IPA
-        uses: game-ci/unity-builder@v4.3.0
-        with:
-          targetPlatform: iOS
-          buildPath: Build/iOS
+          buildsPath: Build/Android
+          unityLicenseFile: unity.ulf
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4.6.1
         with:
           name: builds
-          path: |
-            Build/Android/*.apk
-            Build/iOS/*.ipa
+          path: Build/Android/*.apk
 
   deploy:
-    name: Distribute Builds via Firebase App Distribution
+    name: Distribute Android APK via Firebase App Distribution
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Download Build Artifacts
@@ -56,18 +53,10 @@ jobs:
         with:
           name: builds
 
-      # Firebase CLI の最新 GitHub Action（docker 版）を利用して Android 配布
+      # Firebase CLI (docker版) を利用して APK をアップロード
       - name: Deploy Android APK via Firebase
         uses: docker://w9jds/firebase-action:master
         with:
           args: "appdistribution:distribute $(find Build/Android -name '*.apk') --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups 'testers' --release-notes 'Automated build release from GitHub Actions'"
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-
-      # Firebase CLI の最新 GitHub Action（docker 版）を利用して iOS 配布
-      - name: Deploy iOS IPA via Firebase
-        uses: docker://w9jds/firebase-action:master
-        with:
-          args: "appdistribution:distribute $(find Build/iOS -name '*.ipa') --app ${{ secrets.FIREBASE_IOS_APP_ID }} --groups 'testers' --release-notes 'Automated build release from GitHub Actions'"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
