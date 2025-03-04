@@ -44,13 +44,13 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
-          targetPlatform: Android
-          buildsPath: Build/Android
-          buildName: MyAndroidApp
-          unityVersion: '6000.0.38f1'
+          targetPlatform: Android           # ビルド対象プラットフォーム
+          buildsPath: build                 # 成果物を出力するフォルダ（デフォルト "build"）
+          buildName: MyAndroidApp           # ビルド名（出力APK/AABのファイル名ベース）
+          androidExportType: androidPackage # 出力形式: APKをビルド（省略可、デフォルトがapk）
 
       - name: Debug List build output
-        run: ls -R Build/Android/MyAndroidApp/
+        run: ls -R Build
 
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
