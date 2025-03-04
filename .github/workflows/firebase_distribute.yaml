@@ -15,9 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - name: Clean up Docker space
-        run: docker system prune -a -f
-
       - name: Cache Unity Library
         uses: actions/cache@v4.2.0
         with:
@@ -25,7 +22,6 @@ jobs:
           key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-
-
       - name: Run the build for Android
         uses: game-ci/unity-builder@v4.3.0
         env:
@@ -36,9 +32,6 @@ jobs:
           targetPlatform: Android
           buildsPath: Build/Android
           unityVersion: '6000.0.38f1'
-          buildName: 'MyAndroidApp'
-          versioning: Custom
-          version: '1.0.0'
 
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
