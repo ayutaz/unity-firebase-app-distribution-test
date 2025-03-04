@@ -31,12 +31,16 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           targetPlatform: Android
+          buildsPath: Build/Android
           unityVersion: '6000.0.38f1'
+          buildName: 'MyAndroidApp'
+          versioning: Custom
+          version: '1.0.0'
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4.6.1
+      - name: Upload the Build for Android
+        uses: actions/upload-artifact@v4.6.0
         with:
-          name: builds
+          name: Build-Android
           path: Build/Android/*.apk
 
   deploy:
@@ -45,14 +49,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.2.2
 
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v3
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4.6.0
         with:
-          name: builds
+          name: Build-Android
 
-      # Firebase CLI (docker版) を利用して APK をアップロード
       - name: Deploy Android APK via Firebase
         uses: docker://w9jds/firebase-action:master
         with:
