@@ -74,5 +74,5 @@ jobs:
           appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.GCP_SA_KEY }}   # サービスアカウントキーの内容
           groups: testers
-          file: Build-Android/MyAndroidApp.apk
+          file: MyAndroidApp.apk
           releaseNotes: "Automated build release from GitHub Actions"
