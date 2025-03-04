@@ -57,8 +57,8 @@ jobs:
         with:
           name: Build-Android
           # ディレクトリ全体をアップロード（後で deploy ジョブで中身を確認可能）
-          path: Build/Android/MyAndroidApp/
-
+          path: build/Android/MyAndroidApp.apk
+  
   deploy:
     name: Distribute Android APK via Firebase App Distribution
     needs: build
