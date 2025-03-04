@@ -14,8 +14,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
-      
-      # ディスク容量の確保: スワップ無効化と不要ツール削除
+
+      # ディスク容量の確保
       - name: Free disk space
         run: |
           sudo swapoff -a && sudo rm -f /swapfile
@@ -48,47 +48,42 @@ jobs:
           buildsPath: build                 # 出力フォルダ（小文字の "build" を使用）
           buildName: MyAndroidApp           # ビルド名（生成されるファイル名は MyAndroidApp.apk）
           androidExportType: androidPackage # 出力形式: APKをビルド
-          unityVersion: '6000.0.38f1'
+          unityVersion: '6000.0.38f1'       # 実際のUnityバージョンに合わせて変更
 
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
         with:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
-  
-  deploy:
-    name: Distribute Android APK via Firebase App Distribution
-    needs: build
-    runs-on: ubuntu-latest
-    env:
-      # 認証用 JSON ファイルの生成先
-      GOOGLE_APPLICATION_CREDENTIALS: /tmp/credentials.json
-      PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}  # 必要なら対象プロジェクトIDを設定
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4.2.2
 
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v4.1.9
-        with:
-          name: Build-Android
+      # -----------------------------------------
+      # ここから Firebase App Distribution 配布
+      # -----------------------------------------
 
-      - name: Setup Firebase Credentials
+      # ダウンロードしてきた Artifact (MyAndroidApp.apk) は同じジョブ内なので手元に残っているはずですが
+      # 別ジョブで実行する場合は、actions/download-artifact を使ってダウンロードする必要があります。
+
+      - name: Install Ruby & Fastlane
         run: |
-          echo -n "${{ secrets.GCP_SA_KEY }}" | base64 --decode > $GOOGLE_APPLICATION_CREDENTIALS
-          echo "Created credentials file at $GOOGLE_APPLICATION_CREDENTIALS"
+          sudo apt-get update
+          sudo apt-get install -y ruby-full
+          # 必要な場合は bundler もインストール
+          sudo gem install fastlane
+          # Firebase App Distribution 用のプラグインを入れるには以下
+          # sudo gem install fastlane-plugin-firebase_app_distribution
 
-      - name: Deploy to Firebase App Distribution
-        uses: wzieba/Firebase-Distribution-Github-Action@v1.7.0
-        with:
-          appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-          serviceCredentialsFile: $GOOGLE_APPLICATION_CREDENTIALS
-          groups: testers
-          file: MyAndroidApp.apk
-          releaseNotes: "Automated build release from GitHub Actions"
-          project: ${{ secrets.FIREBASE_PROJECT_ID }}
-      
-      # 認証用 JSON ファイルを削除
-      - name: Delete Firebase Credentials File
-        run: rm $GOOGLE_APPLICATION_CREDENTIALS
-        if: ${{ always() }}
+      - name: Setup Service Account
+        # secrets.GCP_SA_KEY を service_account.json として書き出す
+        run: echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
+
+      - name: Distribute to Firebase App Distribution
+        # fastlane run firebase_app_distribution で直接配布
+        run: |
+          fastlane run firebase_app_distribution \
+            apk_path:"build/Android/MyAndroidApp.apk" \
+            app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
+            service_credentials_file:"service_account.json" \
+            release_notes:"Release from GitHub Actions" \
+            # 必要に応じてテスターやグループを指定
+            # testers:"test1@example.com,test2@example.com" \
+            groups:"testers"
