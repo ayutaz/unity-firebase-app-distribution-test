@@ -50,7 +50,7 @@ jobs:
           androidExportType: androidPackage # 出力形式: APKをビルド（省略可、デフォルトがapk）
 
       - name: Debug List build output
-        run: ls -R Build
+        run: ls -R .
 
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
