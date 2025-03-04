@@ -79,7 +79,7 @@ jobs:
       - name: Deploy Android APK via Firebase
         uses: w9jds/firebase-action@v13.32.0
         with:
-          args: "appdistribution:distribute $(find Build/Android/MyAndroidApp -name '*.apk') --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups 'testers' --release-notes 'Automated build release from GitHub Actions'"
+          args: "appdistribution:distribute build/Android/MyAndroidApp.apk --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} --groups 'testers' --release-notes 'Automated build release from GitHub Actions'"
         env:
-          # 最新の認証方法として GCP_SA_KEY を利用する場合：
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+
