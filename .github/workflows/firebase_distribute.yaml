@@ -75,10 +75,9 @@ jobs:
         with:
           name: Build-Android
 
-      # ここでサービスアカウントキー（Base64 エンコード済み）をデコードして、認証用 JSON ファイルを生成
       - name: Setup Firebase Credentials
         run: |
-          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > $GOOGLE_APPLICATION_CREDENTIALS
+          echo -n "${{ secrets.GCP_SA_KEY }}" | base64 --decode > $GOOGLE_APPLICATION_CREDENTIALS
           echo "Created credentials file at $GOOGLE_APPLICATION_CREDENTIALS"
 
       - name: Upload to Firebase App Distribution
