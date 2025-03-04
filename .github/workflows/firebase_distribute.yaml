@@ -56,7 +56,6 @@ jobs:
         uses: actions/upload-artifact@v4.6.0
         with:
           name: Build-Android
-          # ディレクトリ全体をアップロード（後で deploy ジョブで中身を確認可能）
           path: build/Android/MyAndroidApp.apk
   
   deploy:
