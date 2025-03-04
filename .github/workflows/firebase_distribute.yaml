@@ -90,3 +90,8 @@ jobs:
           file: MyAndroidApp.apk
           releaseNotes: "Automated build release from GitHub Actions"
           project: ${{ secrets.FIREBASE_PROJECT_ID }}
+      
+      # 不要になった認証用JSONファイルを削除
+      - name: Delete Firebase Credentials File
+        run: rm $GOOGLE_APPLICATION_CREDENTIALS
+        if: ${{ always() }}
