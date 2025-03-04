@@ -63,27 +63,22 @@ jobs:
       # ダウンロードしてきた Artifact (MyAndroidApp.apk) は同じジョブ内なので手元に残っているはずですが
       # 別ジョブで実行する場合は、actions/download-artifact を使ってダウンロードする必要があります。
 
+      # fastlane + firebase_app_distribution プラグインのインストール
       - name: Install Ruby & Fastlane
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby-full
-          # 必要な場合は bundler もインストール
           sudo gem install fastlane
-          # Firebase App Distribution 用のプラグインを入れるには以下
-          # sudo gem install fastlane-plugin-firebase_app_distribution
+          sudo gem install fastlane-plugin-firebase_app_distribution
 
       - name: Setup Service Account
-        # secrets.GCP_SA_KEY を service_account.json として書き出す
         run: echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
 
       - name: Distribute to Firebase App Distribution
-        # fastlane run firebase_app_distribution で直接配布
         run: |
           fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
             release_notes:"Release from GitHub Actions" \
-            # 必要に応じてテスターやグループを指定
-            # testers:"test1@example.com,test2@example.com" \
             groups:"testers"
