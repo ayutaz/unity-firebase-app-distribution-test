@@ -50,7 +50,6 @@ jobs:
           androidExportType: androidPackage # 出力形式: APKをビルド
           unityVersion: '6000.0.38f1'
 
-      # アップロード対象ファイルは build/Android/MyAndroidApp.apk として生成される
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
         with:
@@ -62,16 +61,15 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     env:
-      # GOOGLE_APPLICATION_CREDENTIALS を /tmp/credentials.json に設定
+      # 認証用 JSON ファイルの生成先
       GOOGLE_APPLICATION_CREDENTIALS: /tmp/credentials.json
-      # 対象の Firebase プロジェクトID（必要なら）
-      PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}  # 必要なら対象プロジェクトIDを設定
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
       - name: Download Build Artifact
-        uses: actions/download-artifact@v4.1.9
+        uses: actions/download-artifact@v4.6.0
         with:
           name: Build-Android
 
@@ -80,17 +78,17 @@ jobs:
           echo -n "${{ secrets.GCP_SA_KEY }}" | base64 --decode > $GOOGLE_APPLICATION_CREDENTIALS
           echo "Created credentials file at $GOOGLE_APPLICATION_CREDENTIALS"
 
-      - name: Upload to Firebase App Distribution
+      - name: Deploy to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1.7.0
         with:
           appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-          serviceCredentialsFileContent: ${{ secrets.GCP_SA_KEY }}  # Base64 エンコード済みキーをそのまま渡す
+          serviceCredentialsFile: $GOOGLE_APPLICATION_CREDENTIALS
           groups: testers
           file: MyAndroidApp.apk
           releaseNotes: "Automated build release from GitHub Actions"
           project: ${{ secrets.FIREBASE_PROJECT_ID }}
       
-      # 不要になった認証用JSONファイルを削除
+      # 認証用 JSON ファイルを削除
       - name: Delete Firebase Credentials File
         run: rm $GOOGLE_APPLICATION_CREDENTIALS
         if: ${{ always() }}
