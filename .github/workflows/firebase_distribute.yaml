@@ -45,10 +45,12 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           targetPlatform: Android           # ビルド対象プラットフォーム
-          buildsPath: build                 # 成果物を出力するフォルダ（デフォルト "build"）
-          buildName: MyAndroidApp           # ビルド名（出力APK/AABのファイル名ベース）
-          androidExportType: androidPackage # 出力形式: APKをビルド（省略可、デフォルトがapk）
+          buildsPath: build                 # 出力フォルダ（小文字の "build" を使用）
+          buildName: MyAndroidApp           # ビルド名（生成されるファイル名は MyAndroidApp.apk）
+          androidExportType: androidPackage # 出力形式: APKをビルド
+          unityVersion: '6000.0.38f1'
 
+      # アップロード対象ファイルは build/Android/MyAndroidApp.apk として生成される
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
         with:
@@ -59,6 +61,11 @@ jobs:
     name: Distribute Android APK via Firebase App Distribution
     needs: build
     runs-on: ubuntu-latest
+    env:
+      # GOOGLE_APPLICATION_CREDENTIALS を /tmp/credentials.json に設定
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/credentials.json
+      # 対象の Firebase プロジェクトID（必要なら）
+      PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
@@ -68,11 +75,18 @@ jobs:
         with:
           name: Build-Android
 
+      # ここでサービスアカウントキー（Base64 エンコード済み）をデコードして、認証用 JSON ファイルを生成
+      - name: Setup Firebase Credentials
+        run: |
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > $GOOGLE_APPLICATION_CREDENTIALS
+          echo "Created credentials file at $GOOGLE_APPLICATION_CREDENTIALS"
+
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1.7.0
         with:
           appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-          serviceCredentialsFileContent: ${{ secrets.GCP_SA_KEY }}   # サービスアカウントキーの内容
+          serviceCredentialsFileContent: ${{ secrets.GCP_SA_KEY }}  # Base64 エンコード済みキーをそのまま渡す
           groups: testers
           file: MyAndroidApp.apk
           releaseNotes: "Automated build release from GitHub Actions"
+          project: ${{ secrets.FIREBASE_PROJECT_ID }}
