@@ -49,6 +49,9 @@ jobs:
           buildName: MyAndroidApp
           unityVersion: '6000.0.38f1'
 
+      - name: Debug List build output
+        run: ls -R Build/Android/MyAndroidApp/
+
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
         with:
