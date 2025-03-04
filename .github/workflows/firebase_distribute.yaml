@@ -14,22 +14,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
-
+      
       # ディスク容量の確保: スワップ無効化と不要ツール削除
       - name: Free disk space
         run: |
-          # スワップ領域を無効化して削除（約4GB解放）
           sudo swapoff -a && sudo rm -f /swapfile
-          # .NET SDK を削除（約2GB解放）
           sudo rm -rf /usr/share/dotnet
-          # Haskell (GHC) を削除（約5GB解放）
           sudo rm -rf /opt/ghc /usr/local/.ghcup
-          # Google Cloud SDK (google-cloud-cli) を削除
           sudo apt-get remove -y google-cloud-cli || sudo apt-get remove -y google-cloud-sdk
           sudo apt-get autoremove -y && sudo apt-get clean
-          # 未使用の Docker イメージやコンテナを削除
           docker system prune -af
-          # 空き容量の表示（デバッグ用）
           df -h
 
       - name: Clean up Docker space (with volumes)
@@ -42,6 +36,7 @@ jobs:
           key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-
+
       - name: Run the build for Android
         uses: game-ci/unity-builder@v4.3.0
         env:
@@ -51,14 +46,15 @@ jobs:
         with:
           targetPlatform: Android
           buildsPath: Build/Android
-          buildName: MyAndroidApp        # 明示的に指定
+          buildName: MyAndroidApp
           unityVersion: '6000.0.38f1'
 
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
         with:
           name: Build-Android
-          path: Build/Android/MyAndroidApp/*.apk
+          # ディレクトリ全体をアップロード（後で deploy ジョブで中身を確認可能）
+          path: Build/Android/MyAndroidApp/
 
   deploy:
     name: Distribute Android APK via Firebase App Distribution
@@ -72,6 +68,11 @@ jobs:
         uses: actions/download-artifact@v4.1.9
         with:
           name: Build-Android
+
+      # デバッグ用: アップロードされたファイル一覧を表示
+      - name: List downloaded artifact files
+        run: |
+          find . -type f
 
       - name: Deploy Android APK via Firebase
         uses: w9jds/firebase-action@v13.32.0
