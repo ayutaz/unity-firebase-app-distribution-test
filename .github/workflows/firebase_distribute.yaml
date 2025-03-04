@@ -49,9 +49,6 @@ jobs:
           buildName: MyAndroidApp           # ビルド名（出力APK/AABのファイル名ベース）
           androidExportType: androidPackage # 出力形式: APKをビルド（省略可、デフォルトがapk）
 
-      - name: Debug List build output
-        run: ls -R build
-
       - name: Upload the Build for Android
         uses: actions/upload-artifact@v4.6.0
         with:
@@ -70,11 +67,6 @@ jobs:
         uses: actions/download-artifact@v4.1.9
         with:
           name: Build-Android
-
-      # デバッグ用: アップロードされたファイル一覧を表示
-      - name: List downloaded artifact files
-        run: |
-          find . -type f
 
       - name: Deploy Android APK via Firebase
         uses: w9jds/firebase-action@v13.32.0
