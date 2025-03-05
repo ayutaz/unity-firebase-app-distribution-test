@@ -58,35 +58,40 @@ jobs:
 
       - name: Install Ruby (system) & Bundler (user)
         run: |
+          # 1) Ruby はプリインストールされているが、念のためアップデート
           sudo apt-get update
           sudo apt-get install -y ruby-full
-          
-          # Bundler をユーザ領域 (~/.gem) にインストール
-          gem install bundler --user-install
-          
-          # Ruby バージョンに依存せず、ユーザー Gem ディレクトリを取得
+
+          # 2) RubyGems 自体をアップデート（なくても動く場合が多いですが推奨）
+          gem update --system
+
+          # 3) Ruby 2.7 に対応した Bundler 2.4.22 を指定してインストール
+          gem install bundler -v 2.4.22 --user-install
+
+          # 4) GitHub Actions の次ステップでも bundler コマンドが使えるように、PATH を通す
           echo "GEM_HOME=$(ruby -r rubygems -e 'puts Gem.user_dir')" >> $GITHUB_ENV
           echo "PATH=$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH" >> $GITHUB_ENV
-    
+
       - name: Prepare Gemfile
         run: |
+          # Fastlane と Firebase App Distribution プラグインを入れる
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
           echo "gem 'fastlane-plugin-firebase_app_distribution'" >> Gemfile
-    
+
       - name: Bundle install
-        # ここで先ほど書き込んだ $GITHUB_ENV が反映された新しいシェルが使われるので
-        # bundle コマンドが PATH で見つかる
         run: |
-          bundle install --path vendor/bundle
-    
+          # ここで Bundler 2.4.22 を使ってインストール
+          bundle _2.4.22_ install --path vendor/bundle
+
       - name: Setup Service Account
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
-    
+
       - name: Distribute to Firebase App Distribution
         run: |
-          bundle exec fastlane run firebase_app_distribution \
+          # bundle exec にも bundler バージョン指定を加えるとより確実
+          bundle _2.4.22_ exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
