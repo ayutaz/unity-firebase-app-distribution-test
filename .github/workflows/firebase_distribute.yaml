@@ -56,20 +56,15 @@ jobs:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
 
-      - name: Install Ruby & set up Bundler 2.4.x in user-land
+      - name: Install Ruby (system) & Bundler (user)
         run: |
-          # 1) Ensure Ruby is installed (2.7 on ubuntu-20.04)
           sudo apt-get update
           sudo apt-get install -y ruby-full
-
-          # 2) Remove any system-wide Bundler that might conflict
-          #    (エラーになっても続行するよう "|| true" つける)
-          sudo gem uninstall --all bundler || true
-
-          # 3) Bundler 2.4.x 系をユーザー領域 (~/.gem/ruby/2.7.0) にインストール
-          gem install bundler -v 2.4.22 --user-install
-
-          # 4) GitHub Actions の次ステップでも bundler コマンドが使えるようPATHを通す
+          
+          # Bundler をユーザ領域 (~/.gem) にインストール
+          gem install bundler --user-install
+          
+          # Ruby バージョンに依存せず、ユーザー Gem ディレクトリを取得
           echo "GEM_HOME=$(ruby -r rubygems -e 'puts Gem.user_dir')" >> $GITHUB_ENV
           echo "PATH=$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH" >> $GITHUB_ENV
 
