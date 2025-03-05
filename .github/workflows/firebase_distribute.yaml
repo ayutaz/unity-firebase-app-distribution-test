@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build Unity Project (Android)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
@@ -77,14 +77,13 @@ jobs:
         run: |
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
-          # v0.11.1 以上を指定
-          echo "gem 'fastlane-plugin-firebase_app_distribution', '>= 0.11.1'" >> Gemfile
-    
-      - name: Bundle install
-        run: |
-          # `_2.4.22_` は Ruby 2.7 で動作する Bundler バージョンを指定したもの
-          bundle _2.4.22_ install --path vendor/bundle
+          echo "gem 'fastlane-plugin-firebase_app_distribution'" >> Gemfile
 
+      - name: Bundle install
+        # ここで先ほど書き込んだ $GITHUB_ENV が反映された新しいシェルが使われるので
+        # bundle コマンドが PATH で見つかる
+        run: |
+          bundle install --path vendor/bundle
 
       - name: Setup Service Account
         run: |
@@ -92,10 +91,9 @@ jobs:
 
       - name: Distribute to Firebase App Distribution
         run: |
-          bundle _2.4.22_ exec fastlane run firebase_app_distribution \
+          bundle exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
             release_notes:"Release from GitHub Actions" \
-            groups:"testers" \
-            disable_upload_cli:true
+            groups:"testers"
