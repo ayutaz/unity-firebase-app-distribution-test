@@ -56,32 +56,37 @@ jobs:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
 
-      # -----------------------------------------
-      # ここから Firebase App Distribution 配布
-      # -----------------------------------------
-
-      # ダウンロードしてきた Artifact (MyAndroidApp.apk) は同じジョブ内なので手元に残っているはずですが
-      # 別ジョブで実行する場合は、actions/download-artifact を使ってダウンロードする必要があります。
-
-      - name: Setup Ruby & bundler & Fastlane
+      - name: Install Ruby & Bundler (User Install)
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby-full
-          # Gemfile を動的に作成
+          
+          # bundler をユーザーモードでインストール
+          gem install bundler --user-install
+          
+          # .gem ディレクトリを GEM_HOME として設定
+          echo "export GEM_HOME=\"$HOME/.gem\"" >> $GITHUB_ENV
+          # bundler 等が入る .gem/bin ディレクトリを PATH に追加
+          echo "export PATH=\"$HOME/.gem/bin:\$PATH\"" >> $GITHUB_ENV
+
+      - name: Prepare Gemfile
+        # 権限エラーを避けるため、システムに書き込まずプロジェクト内だけで管理
+        run: |
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
           echo "gem 'fastlane-plugin-firebase_app_distribution'" >> Gemfile
-          
-          # bundler をインストールし、Gemfile から fastlane + plugin をインストール
-          sudo gem install bundler
-          bundle install
-    
+
+      - name: Bundle install
+        # 上で設定した $GITHUB_ENV の内容を反映させるために、別ステップで実行
+        run: |
+          bundle install --path vendor/bundle
+
       - name: Setup Service Account
-        run: echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
-    
+        run: |
+          echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
+
       - name: Distribute to Firebase App Distribution
         run: |
-          # bundler の管理下で fastlane を実行
           bundle exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
