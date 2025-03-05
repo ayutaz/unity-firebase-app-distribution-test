@@ -56,28 +56,28 @@ jobs:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
 
-      - name: Install Ruby & Bundler (User Install)
+      # ここから Fastlane / Firebase App Distribution 用のセットアップ
+      - name: Install Ruby (system-wide) and Bundler (user-install)
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby-full
           
-          # bundler をユーザーモードでインストール
+          # Bundler をユーザー領域 (~/.gem) にインストール
           gem install bundler --user-install
           
-          # .gem ディレクトリを GEM_HOME として設定
-          echo "export GEM_HOME=\"$HOME/.gem\"" >> $GITHUB_ENV
-          # bundler 等が入る .gem/bin ディレクトリを PATH に追加
-          echo "export PATH=\"$HOME/.gem/bin:\$PATH\"" >> $GITHUB_ENV
+          # GitHub Actions: 次のステップ以降で使えるよう $PATH と $GEM_HOME を書き込む
+          echo "GEM_HOME=$HOME/.gem" >> $GITHUB_ENV
+          echo "PATH=$HOME/.gem/bin:$PATH" >> $GITHUB_ENV
 
-      - name: Prepare Gemfile
-        # 権限エラーを避けるため、システムに書き込まずプロジェクト内だけで管理
+      - name: Prepare Gemfile for Fastlane
+        # 次のステップで bundle install するときに使う Gemfile を作成
         run: |
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
           echo "gem 'fastlane-plugin-firebase_app_distribution'" >> Gemfile
 
       - name: Bundle install
-        # 上で設定した $GITHUB_ENV の内容を反映させるために、別ステップで実行
+        # ここで $GITHUB_ENV の反映後のシェルが立ち上がるため、bundle コマンドが使える
         run: |
           bundle install --path vendor/bundle
 
@@ -87,6 +87,7 @@ jobs:
 
       - name: Distribute to Firebase App Distribution
         run: |
+          # bundle exec を使うことでインストールした Fastlane / Plugin が有効に
           bundle exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
