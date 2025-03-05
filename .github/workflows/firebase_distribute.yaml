@@ -96,4 +96,5 @@ jobs:
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
             release_notes:"Release from GitHub Actions" \
-            groups:"testers"
+            groups:"testers" \
+            disable_upload_cli:true
