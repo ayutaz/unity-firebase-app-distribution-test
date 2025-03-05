@@ -88,12 +88,27 @@ jobs:
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
 
-      - name: Install Google Cloud CLI
+      - name: Install Google Cloud SDK & Firebase CLI components
         run: |
+          # 1) 前準備: 必要ツールのインストール
           sudo apt-get update
-          sudo apt-get install -y google-cloud-cli
-          # Ubuntu 20.04 であれば `google-cloud-cli` パッケージが利用可能
-          # もしインストールできない場合は、従来の google-cloud-sdk を導入する手順が必要
+          sudo apt-get install -y apt-transport-https ca-certificates gnupg
+          
+          # 2) Google公式のリポジトリ情報を追加
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+            | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+          
+          # 3) GoogleのGPGキーを取得 & 登録
+          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+            | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+          
+          # 4) リポジトリ更新 & google-cloud-sdk のインストール
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-sdk
+          
+          # 5) Firebase関連のコンポーネントをインストール
+          gcloud components install firebase
+
     
       - name: Distribute to Firebase App Distribution
         run: |
