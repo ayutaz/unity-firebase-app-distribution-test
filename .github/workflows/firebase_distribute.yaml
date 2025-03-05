@@ -88,13 +88,19 @@ jobs:
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
 
+      - name: Install Google Cloud CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-cli
+          # Ubuntu 20.04 であれば `google-cloud-cli` パッケージが利用可能
+          # もしインストールできない場合は、従来の google-cloud-sdk を導入する手順が必要
+    
       - name: Distribute to Firebase App Distribution
         run: |
-          # fastlane の実行も bundler バージョンを明示
           bundle _2.4.22_ exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
             release_notes:"Release from GitHub Actions" \
-            groups:"testers" \
-            disable_upload_cli:true
+            groups:"testers"
+
