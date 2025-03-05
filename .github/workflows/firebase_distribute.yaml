@@ -88,11 +88,11 @@ jobs:
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
 
-      - name: Install Google Cloud SDK & Firebase CLI components
+      - name: Install Google Cloud SDK & Firebase CLI
         run: |
           # 1) 前準備: 必要ツールのインストール
           sudo apt-get update
-          sudo apt-get install -y apt-transport-https ca-certificates gnupg
+          sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
           
           # 2) Google公式のリポジトリ情報を追加
           echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
@@ -102,13 +102,15 @@ jobs:
           curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
             | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
           
-          # 4) リポジトリ更新 & google-cloud-sdk のインストール
+          # 4) リポジトリ更新
           sudo apt-get update
-          sudo apt-get install -y google-cloud-sdk
           
-          # 5) Firebase関連のコンポーネントをインストール
-          gcloud components install firebase
-
+          # 5) Google Cloud CLI (google-cloud-cli) + Firebase CLI (google-cloud-cli-firebase) を同時にインストール
+          sudo apt-get install -y google-cloud-cli google-cloud-cli-firebase
+          
+          # 6) 確認 (オプション)
+          gcloud --version
+          which gcloud
     
       - name: Distribute to Firebase App Distribution
         run: |
