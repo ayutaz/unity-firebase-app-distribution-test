@@ -56,32 +56,32 @@ jobs:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
 
-      - name: Install Ruby (system) & Bundler (user)
+      - name: Install Ruby & set up Bundler 2.4.x in user-land
         run: |
-          # 1) Ruby はプリインストールされているが、念のためアップデート
+          # 1) Ensure Ruby is installed (2.7 on ubuntu-20.04)
           sudo apt-get update
           sudo apt-get install -y ruby-full
 
-          # 2) RubyGems 自体をアップデート（なくても動く場合が多いですが推奨）
-          gem update --system
+          # 2) Remove any system-wide Bundler that might conflict
+          #    (エラーになっても続行するよう "|| true" つける)
+          sudo gem uninstall --all bundler || true
 
-          # 3) Ruby 2.7 に対応した Bundler 2.4.22 を指定してインストール
+          # 3) Bundler 2.4.x 系をユーザー領域 (~/.gem/ruby/2.7.0) にインストール
           gem install bundler -v 2.4.22 --user-install
 
-          # 4) GitHub Actions の次ステップでも bundler コマンドが使えるように、PATH を通す
+          # 4) GitHub Actions の次ステップでも bundler コマンドが使えるようPATHを通す
           echo "GEM_HOME=$(ruby -r rubygems -e 'puts Gem.user_dir')" >> $GITHUB_ENV
           echo "PATH=$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH" >> $GITHUB_ENV
 
       - name: Prepare Gemfile
         run: |
-          # Fastlane と Firebase App Distribution プラグインを入れる
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
           echo "gem 'fastlane-plugin-firebase_app_distribution'" >> Gemfile
 
-      - name: Bundle install
+      - name: Bundle install (with Bundler 2.4.x)
         run: |
-          # ここで Bundler 2.4.22 を使ってインストール
+          # `_2.4.22_` を付けることで、明示的に Bundler 2.4.22 を使用
           bundle _2.4.22_ install --path vendor/bundle
 
       - name: Setup Service Account
@@ -90,7 +90,7 @@ jobs:
 
       - name: Distribute to Firebase App Distribution
         run: |
-          # bundle exec にも bundler バージョン指定を加えるとより確実
+          # fastlane の実行も bundler バージョンを明示
           bundle _2.4.22_ exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
