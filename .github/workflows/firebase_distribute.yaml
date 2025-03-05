@@ -88,37 +88,12 @@ jobs:
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
 
-      - name: Install Google Cloud SDK & Firebase CLI (for Ubuntu 20.04)
-        run: |
-          # 1) 前準備: 必要ツールのインストール
-          sudo apt-get update
-          sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
-          
-          # 2) Google公式のリポジトリ情報を追加
-          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-            | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-          
-          # 3) GoogleのGPGキーを取得 & 登録
-          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-            | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-          
-          # 4) リポジトリ更新
-          sudo apt-get update
-          
-          # 5) google-cloud-sdk と google-cloud-sdk-firebase を一緒にインストール
-          sudo apt-get install -y google-cloud-sdk google-cloud-sdk-firebase
-          
-          # （オプション）バージョン確認
-          gcloud --version
-
-
-    
       - name: Distribute to Firebase App Distribution
         run: |
-          bundle _2.4.22_ exec fastlane run firebase_app_distribution \
+          bundle exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
             release_notes:"Release from GitHub Actions" \
-            groups:"testers"
-
+            groups:"testers" \
+            disable_upload_cli:true
