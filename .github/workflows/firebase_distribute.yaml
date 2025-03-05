@@ -77,12 +77,14 @@ jobs:
         run: |
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
-          echo "gem 'fastlane-plugin-firebase_app_distribution'" >> Gemfile
-
-      - name: Bundle install (with Bundler 2.4.x)
+          # v0.11.1 以上を指定
+          echo "gem 'fastlane-plugin-firebase_app_distribution', '>= 0.11.1'" >> Gemfile
+    
+      - name: Bundle install
         run: |
-          # `_2.4.22_` を付けることで、明示的に Bundler 2.4.22 を使用
+          # `_2.4.22_` は Ruby 2.7 で動作する Bundler バージョンを指定したもの
           bundle _2.4.22_ install --path vendor/bundle
+
 
       - name: Setup Service Account
         run: |
@@ -90,7 +92,7 @@ jobs:
 
       - name: Distribute to Firebase App Distribution
         run: |
-          bundle exec fastlane run firebase_app_distribution \
+          bundle _2.4.22_ exec fastlane run firebase_app_distribution \
             apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
