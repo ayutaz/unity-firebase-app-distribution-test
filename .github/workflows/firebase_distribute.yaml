@@ -83,6 +83,13 @@ jobs:
           gcloud auth activate-service-account --key-file=service_account.json
           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Debug Secrets
+        run: |
+          # Secrets の長さを表示 (中身は危険なので出さない)
+          # ※pull_request などでマスクされると "***" となるため10文字以下になりやすい
+          LEN=$(echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | wc -c)
+          echo "Length of GCP_SA_KEY_BASE64: $LEN"
+
       # 5) APK を Firebase App Distribution へアップロード
       - name: Distribute to Firebase App Distribution via CLI
         run: |
