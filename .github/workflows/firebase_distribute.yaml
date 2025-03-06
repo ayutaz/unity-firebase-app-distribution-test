@@ -70,15 +70,19 @@ jobs:
 
       - name: Prepare Gemfile
         run: |
+          # もし Gemfile.lock が存在していると v0.10.0 が固定されている可能性があるので消す
+          rm -f Gemfile.lock
+          
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
-          echo "gem 'fastlane-plugin-firebase_app_distribution'" >> Gemfile
-
+          # ここで >= 0.11.1 と指定し、最新バージョンをインストール
+          echo "gem 'fastlane-plugin-firebase_app_distribution', '>= 0.11.1'" >> Gemfile
+    
       - name: Bundle install
-        # ここで先ほど書き込んだ $GITHUB_ENV が反映された新しいシェルが使われるので
-        # bundle コマンドが PATH で見つかる
         run: |
+          # Gemfile.lock を再生成し、プラグインを 0.11.1+ にする
           bundle install --path vendor/bundle
+
 
       - name: Setup Service Account
         run: |
