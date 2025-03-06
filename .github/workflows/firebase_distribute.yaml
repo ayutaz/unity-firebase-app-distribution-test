@@ -70,19 +70,14 @@ jobs:
 
       - name: Prepare Gemfile
         run: |
-          # もし Gemfile.lock が存在していると v0.10.0 が固定されている可能性があるので消す
-          rm -f Gemfile.lock
-          
+          rm -f Gemfile.lock  # 古いバージョンがlockされている可能性があるため削除
           echo "source 'https://rubygems.org'" > Gemfile
           echo "gem 'fastlane'" >> Gemfile
-          # ここで >= 0.11.1 と指定し、最新バージョンをインストール
-          echo "gem 'fastlane-plugin-firebase_app_distribution', '>= 0.11.1'" >> Gemfile
+          echo "gem 'fastlane-plugin-firebase_app_distribution', github: 'firebase/firebase-app-distribution-fastlane-plugin', branch: 'main'" >> Gemfile
     
       - name: Bundle install
         run: |
-          # Gemfile.lock を再生成し、プラグインを 0.11.1+ にする
           bundle install --path vendor/bundle
-
 
       - name: Setup Service Account
         run: |
@@ -91,8 +86,9 @@ jobs:
       - name: Distribute to Firebase App Distribution
         run: |
           bundle exec fastlane run firebase_app_distribution \
-            apk_path:"build/Android/MyAndroidApp.apk" \
             app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             service_credentials_file:"service_account.json" \
+            apk_path:"build/Android/MyAndroidApp.apk" \
             release_notes:"Release from GitHub Actions" \
-            groups:"testers"
+            groups:"testers" \
+            disable_upload_cli:true
