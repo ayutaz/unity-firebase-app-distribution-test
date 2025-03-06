@@ -81,29 +81,24 @@ jobs:
           LEN=$(echo "${{ secrets.GCP_SA_KEY }}" | wc -c)
           echo "Length of GCP_SA_KEY: $LEN"
 
+
+      # 4) Service Account JSON を復元 ＋ 環境変数設定
       - name: Setup Service Account
         run: |
-          # Base64文字列を復元して書き込む
+          # Base64文字列をデコードして service_account.json を作成
           echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account.json
-          
-          # gcloud で認証
-          gcloud auth activate-service-account --key-file=service_account.json
-          gcloud config set project ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-
-
+          # ファイルサイズ確認（任意）
+          echo "Service Account JSON size: $(stat -c %s service_account.json) bytes"
+        env:
+          # Firebase CLI が自動でこのJSONを使うための環境変数
+          GOOGLE_APPLICATION_CREDENTIALS: $GITHUB_WORKSPACE/service_account.json
 
       # 5) APK を Firebase App Distribution へアップロード
       - name: Distribute to Firebase App Distribution via CLI
+        # Secrets に登録したプロジェクトID (ex: GCP_PROJECT_ID) があるなら --project に利用できます
         run: |
-          # まず access token を取得
-          ACCESS_TOKEN="$(gcloud auth print-access-token)"
-
-          # ダウンロード済みのAPKは作業フォルダに残っている想定
-          # もし別ジョブから Artifact を受け取るなら actions/download-artifact が必要
-          
           firebase appdistribution:distribute build/Android/MyAndroidApp.apk \
             --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} \
             --groups "testers" \
             --release-notes "Release from GitHub Actions" \
-            --token "$ACCESS_TOKEN" \
             --debug
