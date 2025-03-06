@@ -87,5 +87,6 @@ jobs:
           firebase appdistribution:distribute build/Android/MyAndroidApp.apk \
             --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} \
             --groups "testers" \
+            --project "unity-app-distribution" \
             --release-notes "Release from GitHub Actions" \
             --debug
