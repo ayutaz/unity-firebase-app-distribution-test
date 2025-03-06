@@ -55,40 +55,46 @@ jobs:
         with:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
-
-      - name: Install Ruby (system) & Bundler (user)
+      
+      # 2) Google Cloud SDK (gcloud) をインストール
+      - name: Install Google Cloud SDK
         run: |
           sudo apt-get update
-          sudo apt-get install -y ruby-full
-          
-          # Bundler をユーザ領域 (~/.gem) にインストール
-          gem install bundler --user-install
-          
-          # Ruby バージョンに依存せず、ユーザー Gem ディレクトリを取得
-          echo "GEM_HOME=$(ruby -r rubygems -e 'puts Gem.user_dir')" >> $GITHUB_ENV
-          echo "PATH=$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH" >> $GITHUB_ENV
+          sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+            | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+            | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-sdk
 
-      - name: Prepare Gemfile
+      # 3) Firebase CLI インストール (standalone)
+      - name: Install Firebase CLI
         run: |
-          rm -f Gemfile.lock  # 古いバージョンがlockされている可能性があるため削除
-          echo "source 'https://rubygems.org'" > Gemfile
-          echo "gem 'fastlane'" >> Gemfile
-          echo "gem 'fastlane-plugin-firebase_app_distribution', github: 'firebase/firebase-app-distribution-fastlane-plugin', branch: 'main'" >> Gemfile
-    
-      - name: Bundle install
-        run: |
-          bundle install --path vendor/bundle
+          curl -sL https://firebase.tools | bash
+          firebase --version
 
-      - name: Setup Service Account
+      # 4) Service Account を使って gcloud 認証
+      - name: Auth with Service Account
         run: |
           echo "${{ secrets.GCP_SA_KEY }}" > service_account.json
+          # サービスアカウント認証
+          gcloud auth activate-service-account --key-file=service_account.json
+          # プロジェクトIDの設定
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Distribute to Firebase App Distribution
+      # 5) APK を Firebase App Distribution へアップロード
+      - name: Distribute to Firebase App Distribution via CLI
         run: |
-          bundle exec fastlane run firebase_app_distribution \
-            app:"${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
-            service_credentials_file:"service_account.json" \
-            apk_path:"build/Android/MyAndroidApp.apk" \
-            release_notes:"Release from GitHub Actions" \
-            groups:"testers" \
-            disable_upload_cli:true
+          # まず access token を取得
+          ACCESS_TOKEN="$(gcloud auth print-access-token)"
+
+          # ダウンロード済みのAPKは作業フォルダに残っている想定
+          # もし別ジョブから Artifact を受け取るなら actions/download-artifact が必要
+          
+          firebase appdistribution:distribute build/Android/MyAndroidApp.apk \
+            --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} \
+            --groups "testers" \
+            --release-notes "Release from GitHub Actions" \
+            --token "$ACCESS_TOKEN" \
+            --debug
