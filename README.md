@@ -1,7 +1,6 @@
-# UnityTemplateRepository
-Unity Project template Repository
+# GitHub ActionsからFirebase App DistributionでUnityのAndroidビルドを配布するテストリポジトリ
 
-# Demo
+![](Docs/FAD-Release.png)
 
 # requirements
-* Unity 2022.2.0f1
+* Unity 6000.0.38f1
