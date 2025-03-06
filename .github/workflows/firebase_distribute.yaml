@@ -74,29 +74,15 @@ jobs:
           curl -sL https://firebase.tools | bash
           firebase --version
           
-      - name: Debug Secrets
-        run: |
-          # Secrets の長さを表示 (中身は危険なので出さない)
-          # ※pull_request などでマスクされると "***" となるため10文字以下になりやすい
-          LEN=$(echo "${{ secrets.GCP_SA_KEY }}" | wc -c)
-          echo "Length of GCP_SA_KEY: $LEN"
-
-
-      # 4) Service Account JSON を復元 ＋ 環境変数設定
-      - name: Setup Service Account
-        run: |
-          # Base64文字列をデコードして service_account.json を作成
-          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account.json
-          # ファイルサイズ確認（任意）
-          echo "Service Account JSON size: $(stat -c %s service_account.json) bytes"
+      - name: Setup Service Account & Distribute
         env:
-          # Firebase CLI が自動でこのJSONを使うための環境変数
           GOOGLE_APPLICATION_CREDENTIALS: $GITHUB_WORKSPACE/service_account.json
-
-      # 5) APK を Firebase App Distribution へアップロード
-      - name: Distribute to Firebase App Distribution via CLI
-        # Secrets に登録したプロジェクトID (ex: GCP_PROJECT_ID) があるなら --project に利用できます
         run: |
+          # 1) JSON を復元
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account.json
+          echo "Service Account JSON size: $(stat -c %s service_account.json) bytes"
+          
+          # 2) Firebase CLI を使ってアップロード
           firebase appdistribution:distribute build/Android/MyAndroidApp.apk \
             --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} \
             --groups "testers" \
