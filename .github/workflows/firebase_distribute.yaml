@@ -1,4 +1,4 @@
-﻿name: Unity Build and Distribute (Android Only)
+﻿name: Unity Build and Deploy
 
 on:
   push:
@@ -7,9 +7,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  UNITY_VERSION: '6000.0.38f1'
+
 jobs:
-  build:
-    name: Build Unity Project (Android)
+  # Android向けビルドとデプロイジョブ
+  build-android:
+    name: Build and Deploy Android
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -26,39 +30,41 @@ jobs:
           docker system prune -af
           df -h
 
-      - name: Clean up Docker space (with volumes)
+      - name: Clean up Docker space
         run: docker system prune --volumes -a -f
 
-      - name: Cache Unity Library
+      - name: Cache Unity Library - Android
         uses: actions/cache@v4.2.0
         with:
           path: Library
-          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-
+            Library-Android-
 
-      - name: Run the build for Android
+      - name: Build Android App
         uses: game-ci/unity-builder@v4.3.0
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
-          targetPlatform: Android           # ビルド対象プラットフォーム
-          buildsPath: build                 # 出力フォルダ（小文字の "build" を使用）
-          buildName: MyAndroidApp           # ビルド名（生成されるファイル名は MyAndroidApp.apk）
-          androidExportType: androidPackage # 出力形式: APKをビルド
-          unityVersion: '6000.0.38f1'       # 実際のUnityバージョンに合わせて変更
+          targetPlatform: Android
+          buildsPath: build
+          buildName: MyAndroidApp
+          androidExportType: androidPackage
+          unityVersion: ${{ env.UNITY_VERSION }}
 
-      - name: Upload the Build for Android
+      - name: Upload Android Build Artifact
         uses: actions/upload-artifact@v4.6.0
         with:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
-      
-      # 2) Google Cloud SDK (gcloud) をインストール
-      - name: Install Google Cloud SDK
+
+      # Firebase App Distributionへのデプロイ（PRでない場合のみ）
+      - name: Deploy to Firebase App Distribution
+        if: github.event_name != 'pull_request'
         run: |
+          # Google Cloud SDKのインストール
           sudo apt-get update
           sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
           echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
@@ -88,3 +94,112 @@ jobs:
             --app ${{ secrets.FIREBASE_ANDROID_APP_ID }} \
             --groups "testers" \
             --release-notes "Release from GitHub Actions" \
+
+  # WebGL向けビルドとデプロイジョブ
+  build-webgl:
+    name: Build and Deploy WebGL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      # ディスク容量の確保
+      - name: Free disk space
+        run: |
+          sudo swapoff -a && sudo rm -f /swapfile
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc /usr/local/.ghcup
+          sudo apt-get remove -y google-cloud-cli || sudo apt-get remove -y google-cloud-sdk
+          sudo apt-get autoremove -y && sudo apt-get clean
+          docker system prune -af
+          df -h
+
+      - name: Clean up Docker space
+        run: docker system prune --volumes -a -f
+
+      - name: Cache Unity Library - WebGL
+        uses: actions/cache@v4.2.0
+        with:
+          path: Library
+          key: Library-WebGL-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-WebGL-
+
+      - name: Build WebGL App
+        uses: game-ci/unity-builder@v4.3.0
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          targetPlatform: WebGL
+          buildsPath: build
+          buildName: WebGL
+          unityVersion: ${{ env.UNITY_VERSION }}
+
+      - name: Upload WebGL Build Artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: Build-WebGL
+          path: build/WebGL
+          retention-days: 14
+
+      # ブランチ名からチャンネルIDを生成（PRでない場合のみ）
+      - name: Generate Channel ID
+        if: github.event_name != 'pull_request'
+        id: channel
+        run: |
+          # ブランチ名から有効なチャンネルIDを作成
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          CHANNEL_ID=$(echo $BRANCH_NAME | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]')
+          
+          # mainブランチの場合は特別扱い
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            CHANNEL_ID="production"
+          fi
+          
+          echo "CHANNEL_ID=$CHANNEL_ID" >> $GITHUB_ENV
+
+      # Firebase設定ファイルの作成（PRでない場合のみ）
+      - name: Create Firebase Config
+        if: github.event_name != 'pull_request'
+        run: |
+          echo '{
+            "hosting": {
+              "public": "build/WebGL",
+              "ignore": [
+                "firebase.json",
+                "**/.*",
+                "**/node_modules/**"
+              ]
+            }
+          }' > firebase.json
+          
+          echo '{
+            "projects": {
+              "default": "${{ env.FIREBASE_PROJECT_ID }}"
+            }
+          }' > .firebaserc
+
+      # Firebase Hostingにデプロイ（PRでない場合のみ）
+      - name: Deploy to Firebase Hosting
+        if: github.event_name != 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          projectId: ${{ env.FIREBASE_PROJECT_ID }}
+          channelId: ${{ env.CHANNEL_ID }}
+        env:
+          FIREBASE_CLI_PREVIEWS: hostingchannels
+
+      # デプロイURL表示（PRでない場合のみ）
+      - name: Output Deploy URL
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "WebGL build deployed to Firebase!"
+          if [[ "${{ env.CHANNEL_ID }}" == "production" ]]; then
+            echo "Production URL: https://${{ env.FIREBASE_PROJECT_ID }}.web.app"
+          else
+            echo "Preview URL: https://${{ env.CHANNEL_ID }}--${{ env.FIREBASE_PROJECT_ID }}.web.app"
+          fi
