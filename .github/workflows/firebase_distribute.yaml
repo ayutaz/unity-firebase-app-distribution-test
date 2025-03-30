@@ -143,63 +143,115 @@ jobs:
           name: Build-WebGL
           path: build/WebGL
           retention-days: 14
-
+      
       # ブランチ名からチャンネルIDを生成（PRでない場合のみ）
       - name: Generate Channel ID
         if: github.event_name != 'pull_request'
         id: channel
         run: |
-          # ブランチ名から有効なチャンネルIDを作成
+          # ブランチ名を整形してチャンネルIDにする
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          CHANNEL_ID=$(echo $BRANCH_NAME | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]')
-          
-          # mainブランチの場合は特別扱い
+          CHANNEL_ID=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed -e 's/[_\/]\+/-/g' -e 's/^-*//' -e 's/-*$//' -e 's/--*/-/g')
+          CHANNEL_ID=$(echo "$CHANNEL_ID" | tr -cd 'a-z0-9-' | cut -c 1-36)
+
+          # mainブランチの場合は 'live' チャンネルを指定 (Firebase のデフォルト本番チャンネル)
           if [[ "$BRANCH_NAME" == "main" ]]; then
-            CHANNEL_ID="production"
+            CHANNEL_ID="live" # 本番環境は 'live' チャンネルを使うのが一般的
           fi
-          
+
+          # チャンネルIDが空やハイフンだけになった場合のフォールバック
+          if [[ -z "$CHANNEL_ID" || "$CHANNEL_ID" == "-" ]]; then
+            CHANNEL_ID="preview-${GITHUB_SHA::7}"
+          fi
+
+          echo "Generated Channel ID: $CHANNEL_ID"
           echo "CHANNEL_ID=$CHANNEL_ID" >> $GITHUB_ENV
 
-      # Firebase設定ファイルの作成（PRでない場合のみ）
-      - name: Create Firebase Config
+      # Firebase CLI を使って Hosting にデプロイ（PRでない場合のみ）
+      - name: Deploy to Firebase Hosting using CLI
         if: github.event_name != 'pull_request'
         run: |
-          echo '{
-            "hosting": {
-              "public": "build/WebGL",
-              "ignore": [
-                "firebase.json",
-                "**/.*",
-                "**/node_modules/**"
-              ]
-            }
-          }' > firebase.json
-          
-          echo '{
-            "projects": {
-              "default": "${{ env.FIREBASE_PROJECT_ID }}"
-            }
-          }' > .firebaserc
+          # Firebase CLI がインストールされているか確認・インストール
+          # Androidジョブでインストール済みの想定だが、独立実行の可能性も考慮
+          if ! command -v firebase &> /dev/null
+          then
+              echo "Firebase CLI not found, installing..."
+              # 依存関係の可能性のある curl を先に確認・インストール
+              if ! command -v curl &> /dev/null; then sudo apt-get update && sudo apt-get install -y curl; fi
+              curl -sL https://firebase.tools | bash
+          fi
+          firebase --version
 
-      # Firebase Hostingにデプロイ（PRでない場合のみ）
-      - name: Deploy to Firebase Hosting
-        if: github.event_name != 'pull_request'
-        uses: FirebaseExtended/action-hosting-deploy@v0.9.0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.GCP_SA_KEY }}'
-          projectId: ${{ env.FIREBASE_PROJECT_ID }}
-          channelId: ${{ env.CHANNEL_ID }}
+          # サービスアカウントキーをファイルに書き出す
+          # 注意: GitHub Secret に JSON をそのまま貼り付けた場合は Base64 デコードは不要です。
+          # もし Secret を Base64 エンコードして保存している場合は、下のコメントアウトを解除してください。
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service_account.json
+          # echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" | base64 --decode > service_account.json
+
+          # ファイルが正常に作成されたか確認
+          if [ ! -s service_account.json ]; then
+            echo "Error: Failed to create service account file or file is empty."
+            ls -l # ファイルの状態を確認
+            cat service_account.json # 内容を確認 (空でないか)
+            exit 1
+          fi
+          echo "Service Account JSON size: $(stat -c %s service_account.json) bytes"
+
+          # 環境変数を設定して Firebase にログイン (サービスアカウントを使用)
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service_account.json"
+
+          # --- デプロイコマンド ---
+          # プロジェクトIDを環境変数から取得
+          FIREBASE_PROJECT="${{ env.FIREBASE_PROJECT_ID }}"
+          if [ -z "$FIREBASE_PROJECT" ]; then
+            echo "Error: FIREBASE_PROJECT_ID environment variable is not set."
+            exit 1
+          fi
+
+          # チャンネルIDを取得
+          DEPLOY_CHANNEL="${{ env.CHANNEL_ID }}"
+          echo "Deploying to project '$FIREBASE_PROJECT' on channel '$DEPLOY_CHANNEL'"
+
+          # 'live' チャンネル (本番) へのデプロイか、プレビューチャンネルへのデプロイかを判定
+          if [[ "$DEPLOY_CHANNEL" == "live" ]]; then
+             echo "Deploying to production (live) channel..."
+             # 本番デプロイコマンド
+             firebase deploy \
+               --project "$FIREBASE_PROJECT" \
+               --only hosting \
+               --public build/WebGL \
+               --message "Deploy build ${{ github.run_number }} from commit ${{ github.sha }} (branch: ${GITHUB_REF_NAME})" \
+               --force # 非インタラクティブモードで実行（確認プロンプトをスキップ）
+          else
+             echo "Deploying to preview channel: $DEPLOY_CHANNEL"
+             # プレビューチャンネルへのデプロイコマンド (チャンネルが存在しない場合は作成される)
+             firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
+               --project "$FIREBASE_PROJECT" \
+               --only hosting \
+               --public build/WebGL \
+               --expires 7d # プレビューチャンネルの有効期限 (例: 7日間、不要なら削除)
+               # --json # 必要ならJSON出力
+               # --force # 必要な場合
+          fi
+          echo "Firebase deployment command executed."
+
         env:
+          # Hosting Channels プレビュー機能（現在は一般利用可能だが念のため）
           FIREBASE_CLI_PREVIEWS: hostingchannels
+          # CI環境であることを示す（一部のプロンプトを抑制する可能性）
+          CI: true
 
       # デプロイURL表示（PRでない場合のみ）
       - name: Output Deploy URL
         if: github.event_name != 'pull_request'
         run: |
-          echo "WebGL build deployed to Firebase!"
-          if [[ "${{ env.CHANNEL_ID }}" == "production" ]]; then
+          echo "WebGL build deployment process finished for channel: ${{ env.CHANNEL_ID }}"
+          # channelId が 'live' の場合、本番URLを表示
+          # それ以外はプレビューチャンネルのURLを表示
+          if [[ "${{ env.CHANNEL_ID }}" == "live" ]]; then
             echo "Production URL: https://${{ env.FIREBASE_PROJECT_ID }}.web.app"
+            echo "Production URL (firebaseapp.com): https://${{ env.FIREBASE_PROJECT_ID }}.firebaseapp.com"
           else
-            echo "Preview URL: https://${{ env.CHANNEL_ID }}--${{ env.FIREBASE_PROJECT_ID }}.web.app"
+            echo "Preview URL: https://${{ env.FIREBASE_PROJECT_ID }}--${{ env.CHANNEL_ID }}.web.app"
+            echo "Preview URL (firebaseapp.com): https://${{ env.FIREBASE_PROJECT_ID }}--${{ env.CHANNEL_ID }}.firebaseapp.com"
           fi
