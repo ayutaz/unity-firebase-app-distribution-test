@@ -217,7 +217,7 @@ jobs:
           echo "Creating temporary firebase.json..."
           echo '{
             "hosting": {
-              "public": "'"$PUBLIC_DIR"'", # ★ 修正後の $PUBLIC_DIR を使用
+              "public": "'"$PUBLIC_DIR"'",
               "ignore": [
                 "firebase.json",
                 "**/.*",
