@@ -11,5 +11,5 @@
 * Unity 6000.0.43f1
 
 # 解説記事
-
-[UnityのAndroidビルドをGitHub Actionsで自動ビルドしてFirebase App Distributionに自動配布する](https://ayousanz.hatenadiary.jp/entry/2025/03/06/190157)
+* [UnityのAndroidビルドをGitHub Actionsで自動ビルドしてFirebase App Distributionに自動配布する](https://ayousanz.hatenadiary.jp/entry/2025/03/06/190157)
+* [UnityのWebビルドをGiHubActionsで自動ビルドしてFirebase Hostingにデプロイする](https://ayousanz.hatenadiary.jp/entry/2025/03/30/190144)
