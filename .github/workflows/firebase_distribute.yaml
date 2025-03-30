@@ -240,7 +240,7 @@ jobs:
 
           # チャンネルに応じたデプロイコマンド (変更なし)
           if [[ "$DEPLOY_CHANNEL" == "live" ]]; then
-             # (省略)...
+             echo "Deploying to production (live) channel..."
              firebase deploy \
                --project "$FIREBASE_PROJECT" \
                --only hosting \
@@ -248,7 +248,7 @@ jobs:
                --force \
                --debug
           else
-             # (省略)...
+             echo "Deploying to preview channel: $DEPLOY_CHANNEL"
              firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
                --project "$FIREBASE_PROJECT" \
                --only hosting \
