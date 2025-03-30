@@ -171,10 +171,8 @@ jobs:
           echo "--- Debug Info ---"
           echo "GitHub Event Name: ${{ github.event_name }}"
           echo "Target Branch/Ref: ${{ github.ref }}"
-          # ★ プロジェクトIDの値を確認
           echo "Firebase Project ID from env: [${{ env.FIREBASE_PROJECT_ID }}]"
           echo "Calculated Channel ID: ${{ env.CHANNEL_ID }}"
-          # ★ Android と同じ Secret (GCP_SA_KEY) の存在確認
           if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
             echo "Error: GCP_SA_KEY secret is not set or empty."
             exit 1
@@ -183,47 +181,59 @@ jobs:
           fi
           echo "--- End Debug Info ---"
 
-          # Firebase CLI がインストールされているか確認・インストール
-          if ! command -v firebase &> /dev/null
-          then
+          # Firebase CLI インストール
+          if ! command -v firebase &> /dev/null; then
               echo "Firebase CLI not found, installing..."
               if ! command -v curl &> /dev/null; then sudo apt-get update && sudo apt-get install -y curl; fi
               curl -sL https://firebase.tools | bash
           fi
           firebase --version
 
-          # ★★★ サービスアカウントキーをファイルに書き出す (Android と同じ Secret と Base64 デコードを使用) ★★★
+          # サービスアカウントキー処理
           echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account_webgl.json
-
-          # ファイルが正常に作成されたか確認 (サイズが小さい場合はエラー)
           JSON_SIZE=$(stat -c %s service_account_webgl.json)
           echo "WebGL Service Account JSON size: $JSON_SIZE bytes"
-          if [ "$JSON_SIZE" -lt 100 ]; then # 正常なJSONキーは通常100バイト以上
-            echo "Error: Failed to create valid WebGL service account file or file is too small."
-            cat service_account_webgl.json # 中身を確認
+          if [ "$JSON_SIZE" -lt 100 ]; then
+            echo "Error: Failed to create valid WebGL service account file."
+            cat service_account_webgl.json
             exit 1
           fi
-          # ★ ファイル名を指定して環境変数を設定
           export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service_account_webgl.json"
 
           # --- デプロイコマンド ---
-          # ★ プロジェクトIDを環境変数から取得し、空でないかチェック
           FIREBASE_PROJECT="${{ env.FIREBASE_PROJECT_ID }}"
           if [ -z "$FIREBASE_PROJECT" ]; then
-            echo "Error: FIREBASE_PROJECT_ID environment variable is not set or empty. Check workflow 'env' block and repository secrets."
+            echo "Error: FIREBASE_PROJECT_ID env var is not set."
             exit 1
           fi
 
           DEPLOY_CHANNEL="${{ env.CHANNEL_ID }}"
-          echo "Deploying to project '$FIREBASE_PROJECT' on channel '$DEPLOY_CHANNEL'"
-
-          # ★ ビルド成果物のパスを確認・修正 ('build/WebGL' が正しいか？)
+          # ★ 公開するディレクトリ（ビルド成果物の場所）
           PUBLIC_DIR="build/WebGL"
+
+          # ↓↓↓ ★ firebase.json ファイルを作成する処理を追加 ★ ↓↓↓
+          echo "Creating temporary firebase.json..."
+          echo '{
+            "hosting": {
+              "public": "'"$PUBLIC_DIR"'",
+              "ignore": [
+                "firebase.json",
+                "**/.*",
+                "**/node_modules/**"
+              ]
+            }
+          }' > firebase.json
+          echo "Generated firebase.json:"
+          cat firebase.json # 作成された内容をログに出力
+
+          # ★ ビルド成果物ディレクトリの存在確認
           if [ ! -d "$PUBLIC_DIR" ]; then
-             echo "Error: Public directory '$PUBLIC_DIR' not found. Check 'Build WebGL App' step's 'buildsPath' and 'Upload WebGL Build Artifact' step's 'path'."
-             ls -l build/ # build ディレクトリの内容を表示
+             echo "Error: Public directory '$PUBLIC_DIR' not found. Check build output path."
+             ls -l build/
              exit 1
           fi
+
+          echo "Deploying to project '$FIREBASE_PROJECT' on channel '$DEPLOY_CHANNEL'"
 
           # チャンネルに応じてデプロイコマンドを分岐
           if [[ "$DEPLOY_CHANNEL" == "live" ]]; then
@@ -231,18 +241,18 @@ jobs:
              firebase deploy \
                --project "$FIREBASE_PROJECT" \
                --only hosting \
-               --public "$PUBLIC_DIR" \
+               # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
                --message "Deploy build ${{ github.run_number }} from commit ${{ github.sha }} (branch: ${GITHUB_REF_NAME})" \
                --force \
-               --debug # 詳細ログ表示
+               --debug
           else
              echo "Deploying to preview channel: $DEPLOY_CHANNEL"
              firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
                --project "$FIREBASE_PROJECT" \
                --only hosting \
-               --public "$PUBLIC_DIR" \
+               # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
                --expires 7d \
-               --debug # 詳細ログ表示
+               --debug
           fi
           echo "Firebase deployment command executed."
 
