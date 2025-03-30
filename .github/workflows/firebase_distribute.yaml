@@ -9,6 +9,7 @@ on:
 
 env:
   UNITY_VERSION: '6000.0.38f1'
+  FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
 
 jobs:
   # Android向けビルドとデプロイジョブ
