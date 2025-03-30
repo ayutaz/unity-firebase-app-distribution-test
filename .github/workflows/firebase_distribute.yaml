@@ -209,13 +209,15 @@ jobs:
 
           DEPLOY_CHANNEL="${{ env.CHANNEL_ID }}"
           # ★ 公開するディレクトリ（ビルド成果物の場所）
-          PUBLIC_DIR="build/WebGL"
+          DEPLOY_CHANNEL="${{ env.CHANNEL_ID }}"
+          # ↓↓↓ ★★★ 公開ディレクトリのパスを修正 ★★★ ↓↓↓
+          PUBLIC_DIR="build/WebGL/WebGL"
 
-          # ↓↓↓ ★ firebase.json ファイルを作成する処理を追加 ★ ↓↓↓
+          # firebase.json 作成 (public の値を修正後のパスにする)
           echo "Creating temporary firebase.json..."
           echo '{
             "hosting": {
-              "public": "'"$PUBLIC_DIR"'",
+              "public": "'"$PUBLIC_DIR"'", # ★ 修正後の $PUBLIC_DIR を使用
               "ignore": [
                 "firebase.json",
                 "**/.*",
@@ -224,66 +226,51 @@ jobs:
             }
           }' > firebase.json
           echo "Generated firebase.json:"
-          cat firebase.json # 作成された内容をログに出力
-          
-                    # ↓↓↓ ★★★ ビルド成果物ディレクトリの内容と index.html の存在を確認 ★★★ ↓↓↓
+          cat firebase.json
+
+          # ★ ビルド成果物ディレクトリの内容と index.html の存在を確認 (チェック対象のパスを修正) ★
           echo "-----------------------------------------------------"
           echo "Checking contents of public directory: $PUBLIC_DIR"
           if [ -d "$PUBLIC_DIR" ]; then
-            # ディレクトリの内容をリスト表示
             ls -la "$PUBLIC_DIR"
             # index.html ファイルの存在を確認
             if [ -f "$PUBLIC_DIR/index.html" ]; then
               echo "OK: index.html found in $PUBLIC_DIR."
             else
-              # index.html が見つからない場合はエラー終了
               echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
               echo "Error: index.html NOT found in public directory ($PUBLIC_DIR)!"
-              echo "This is likely due to an incomplete or failed Unity build."
-              echo "Check the 'Build WebGL App' step logs for errors."
-              echo "Listing contents of 'build/' directory:"
-              ls -l build/ # 参考情報
+              echo "Build output structure might be different than expected."
+              echo "Listing contents of 'build/WebGL/' directory:"
+              ls -la build/WebGL/ # 参考情報
               echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-              exit 1 # エラーで終了
+              exit 1
             fi
           else
-             # public ディレクトリ自体が見つからない場合もエラー終了
              echo "Error: Public directory '$PUBLIC_DIR' not found."
-             echo "Check 'Build WebGL App' step's 'buildsPath' configuration."
-             ls -l build/ # 参考情報
-             exit 1 # エラーで終了
-          fi
-          echo "-----------------------------------------------------"
-          # ↑↑↑ ★★★ 確認処理ここまで ★★★ ↑↑↑
-
-          # ★ ビルド成果物ディレクトリの存在確認
-          if [ ! -d "$PUBLIC_DIR" ]; then
-             echo "Error: Public directory '$PUBLIC_DIR' not found. Check build output path."
-             ls -l build/
+             echo "Check 'Build WebGL App' step output structure."
+             ls -l build/WebGL/ # 参考情報
              exit 1
           fi
+          echo "-----------------------------------------------------"
 
           echo "Deploying to project '$FIREBASE_PROJECT' on channel '$DEPLOY_CHANNEL'"
-          
-          # チャンネルに応じてデプロイコマンドを分岐
+
+          # チャンネルに応じたデプロイコマンド (変更なし)
           if [[ "$DEPLOY_CHANNEL" == "live" ]]; then
-            echo "Deploying to production (live) channel..."
-            firebase deploy \
-            --project "$FIREBASE_PROJECT" \
-            --only hosting \
-            # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
-            --message "Deploy build ${{ github.run_number }} from commit ${{ github.sha }} (branch: ${GITHUB_REF_NAME})" \ # ← 行末に \ を追加
-            --force \
-            --debug
+             # (省略)...
+             firebase deploy \
+               --project "$FIREBASE_PROJECT" \
+               --only hosting \
+               --message "Deploy build ${{ github.run_number }} from commit ${{ github.sha }} (branch: ${GITHUB_REF_NAME})" \
+               --force \
+               --debug
           else
-            # (プレビューチャンネルのコマンドは変更なし)
-            echo "Deploying to preview channel: $DEPLOY_CHANNEL"
-            firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
-            --project "$FIREBASE_PROJECT" \
-            --only hosting \
-            # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
-            --expires 7d \
-            --debug
+             # (省略)...
+             firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
+               --project "$FIREBASE_PROJECT" \
+               --only hosting \
+               --expires 7d \
+               --debug
           fi
           echo "Firebase deployment command executed."
 
