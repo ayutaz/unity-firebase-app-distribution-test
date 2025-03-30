@@ -95,10 +95,11 @@ jobs:
             --groups "testers" \
             --release-notes "Release from GitHub Actions" \
 
-  # WebGL向けビルドとデプロイジョブ
+  # WebGL向けビルドとデプロイジョブ (修正箇所に ★ マーク)
   build-webgl:
     name: Build and Deploy WebGL
     runs-on: ubuntu-latest
+    # needs: build-android # 必要なら依存関係を設定
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
@@ -141,29 +142,23 @@ jobs:
         uses: actions/upload-artifact@v4.6.0
         with:
           name: Build-WebGL
-          path: build/WebGL
+          path: build/WebGL # ★ ビルド出力先と合わせる
           retention-days: 14
-      
+
       # ブランチ名からチャンネルIDを生成（PRでない場合のみ）
       - name: Generate Channel ID
         if: github.event_name != 'pull_request'
         id: channel
         run: |
-          # ブランチ名を整形してチャンネルIDにする
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           CHANNEL_ID=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed -e 's/[_\/]\+/-/g' -e 's/^-*//' -e 's/-*$//' -e 's/--*/-/g')
           CHANNEL_ID=$(echo "$CHANNEL_ID" | tr -cd 'a-z0-9-' | cut -c 1-36)
-
-          # mainブランチの場合は 'live' チャンネルを指定 (Firebase のデフォルト本番チャンネル)
           if [[ "$BRANCH_NAME" == "main" ]]; then
-            CHANNEL_ID="live" # 本番環境は 'live' チャンネルを使うのが一般的
+            CHANNEL_ID="live"
           fi
-
-          # チャンネルIDが空やハイフンだけになった場合のフォールバック
           if [[ -z "$CHANNEL_ID" || "$CHANNEL_ID" == "-" ]]; then
             CHANNEL_ID="preview-${GITHUB_SHA::7}"
           fi
-
           echo "Generated Channel ID: $CHANNEL_ID"
           echo "CHANNEL_ID=$CHANNEL_ID" >> $GITHUB_ENV
 
@@ -171,74 +166,87 @@ jobs:
       - name: Deploy to Firebase Hosting using CLI
         if: github.event_name != 'pull_request'
         run: |
+          # --- デバッグ情報表示 ---
+          echo "--- Debug Info ---"
+          echo "GitHub Event Name: ${{ github.event_name }}"
+          echo "Target Branch/Ref: ${{ github.ref }}"
+          # ★ プロジェクトIDの値を確認
+          echo "Firebase Project ID from env: [${{ env.FIREBASE_PROJECT_ID }}]"
+          echo "Calculated Channel ID: ${{ env.CHANNEL_ID }}"
+          # ★ Android と同じ Secret (GCP_SA_KEY) の存在確認
+          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "Error: GCP_SA_KEY secret is not set or empty."
+            exit 1
+          else
+            echo "GCP_SA_KEY secret is set (length check)."
+          fi
+          echo "--- End Debug Info ---"
+
           # Firebase CLI がインストールされているか確認・インストール
-          # Androidジョブでインストール済みの想定だが、独立実行の可能性も考慮
           if ! command -v firebase &> /dev/null
           then
               echo "Firebase CLI not found, installing..."
-              # 依存関係の可能性のある curl を先に確認・インストール
               if ! command -v curl &> /dev/null; then sudo apt-get update && sudo apt-get install -y curl; fi
               curl -sL https://firebase.tools | bash
           fi
           firebase --version
 
-          # サービスアカウントキーをファイルに書き出す
-          # 注意: GitHub Secret に JSON をそのまま貼り付けた場合は Base64 デコードは不要です。
-          # もし Secret を Base64 エンコードして保存している場合は、下のコメントアウトを解除してください。
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service_account.json
-          # echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" | base64 --decode > service_account.json
+          # ★★★ サービスアカウントキーをファイルに書き出す (Android と同じ Secret と Base64 デコードを使用) ★★★
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account_webgl.json
 
-          # ファイルが正常に作成されたか確認
-          if [ ! -s service_account.json ]; then
-            echo "Error: Failed to create service account file or file is empty."
-            ls -l # ファイルの状態を確認
-            cat service_account.json # 内容を確認 (空でないか)
+          # ファイルが正常に作成されたか確認 (サイズが小さい場合はエラー)
+          JSON_SIZE=$(stat -c %s service_account_webgl.json)
+          echo "WebGL Service Account JSON size: $JSON_SIZE bytes"
+          if [ "$JSON_SIZE" -lt 100 ]; then # 正常なJSONキーは通常100バイト以上
+            echo "Error: Failed to create valid WebGL service account file or file is too small."
+            cat service_account_webgl.json # 中身を確認
             exit 1
           fi
-          echo "Service Account JSON size: $(stat -c %s service_account.json) bytes"
-
-          # 環境変数を設定して Firebase にログイン (サービスアカウントを使用)
-          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service_account.json"
+          # ★ ファイル名を指定して環境変数を設定
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service_account_webgl.json"
 
           # --- デプロイコマンド ---
-          # プロジェクトIDを環境変数から取得
+          # ★ プロジェクトIDを環境変数から取得し、空でないかチェック
           FIREBASE_PROJECT="${{ env.FIREBASE_PROJECT_ID }}"
           if [ -z "$FIREBASE_PROJECT" ]; then
-            echo "Error: FIREBASE_PROJECT_ID environment variable is not set."
+            echo "Error: FIREBASE_PROJECT_ID environment variable is not set or empty. Check workflow 'env' block and repository secrets."
             exit 1
           fi
 
-          # チャンネルIDを取得
           DEPLOY_CHANNEL="${{ env.CHANNEL_ID }}"
           echo "Deploying to project '$FIREBASE_PROJECT' on channel '$DEPLOY_CHANNEL'"
 
-          # 'live' チャンネル (本番) へのデプロイか、プレビューチャンネルへのデプロイかを判定
+          # ★ ビルド成果物のパスを確認・修正 ('build/WebGL' が正しいか？)
+          PUBLIC_DIR="build/WebGL"
+          if [ ! -d "$PUBLIC_DIR" ]; then
+             echo "Error: Public directory '$PUBLIC_DIR' not found. Check 'Build WebGL App' step's 'buildsPath' and 'Upload WebGL Build Artifact' step's 'path'."
+             ls -l build/ # build ディレクトリの内容を表示
+             exit 1
+          fi
+
+          # チャンネルに応じてデプロイコマンドを分岐
           if [[ "$DEPLOY_CHANNEL" == "live" ]]; then
              echo "Deploying to production (live) channel..."
-             # 本番デプロイコマンド
              firebase deploy \
                --project "$FIREBASE_PROJECT" \
                --only hosting \
-               --public build/WebGL \
+               --public "$PUBLIC_DIR" \
                --message "Deploy build ${{ github.run_number }} from commit ${{ github.sha }} (branch: ${GITHUB_REF_NAME})" \
-               --force # 非インタラクティブモードで実行（確認プロンプトをスキップ）
+               --force \
+               --debug # 詳細ログ表示
           else
              echo "Deploying to preview channel: $DEPLOY_CHANNEL"
-             # プレビューチャンネルへのデプロイコマンド (チャンネルが存在しない場合は作成される)
              firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
                --project "$FIREBASE_PROJECT" \
                --only hosting \
-               --public build/WebGL \
-               --expires 7d # プレビューチャンネルの有効期限 (例: 7日間、不要なら削除)
-               # --json # 必要ならJSON出力
-               # --force # 必要な場合
+               --public "$PUBLIC_DIR" \
+               --expires 7d \
+               --debug # 詳細ログ表示
           fi
           echo "Firebase deployment command executed."
 
         env:
-          # Hosting Channels プレビュー機能（現在は一般利用可能だが念のため）
           FIREBASE_CLI_PREVIEWS: hostingchannels
-          # CI環境であることを示す（一部のプロンプトを抑制する可能性）
           CI: true
 
       # デプロイURL表示（PRでない場合のみ）
