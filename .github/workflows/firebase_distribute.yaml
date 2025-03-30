@@ -80,7 +80,7 @@ jobs:
         run: |
           curl -sL https://firebase.tools | bash
           firebase --version
-          
+
       - name: Setup Service Account & Distribute
         run: |
           # 1) JSON を復元
@@ -234,25 +234,26 @@ jobs:
           fi
 
           echo "Deploying to project '$FIREBASE_PROJECT' on channel '$DEPLOY_CHANNEL'"
-
+          
           # チャンネルに応じてデプロイコマンドを分岐
           if [[ "$DEPLOY_CHANNEL" == "live" ]]; then
-             echo "Deploying to production (live) channel..."
-             firebase deploy \
-               --project "$FIREBASE_PROJECT" \
-               --only hosting \
-               # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
-               --message "Deploy build ${{ github.run_number }} from commit ${{ github.sha }} (branch: ${GITHUB_REF_NAME})" \
-               --force \
-               --debug
+            echo "Deploying to production (live) channel..."
+            firebase deploy \
+            --project "$FIREBASE_PROJECT" \
+            --only hosting \
+            # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
+            --message "Deploy build ${{ github.run_number }} from commit ${{ github.sha }} (branch: ${GITHUB_REF_NAME})" \ # ← 行末に \ を追加
+            --force \
+            --debug
           else
-             echo "Deploying to preview channel: $DEPLOY_CHANNEL"
-             firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
-               --project "$FIREBASE_PROJECT" \
-               --only hosting \
-               # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
-               --expires 7d \
-               --debug
+            # (プレビューチャンネルのコマンドは変更なし)
+            echo "Deploying to preview channel: $DEPLOY_CHANNEL"
+            firebase hosting:channel:deploy "$DEPLOY_CHANNEL" \
+            --project "$FIREBASE_PROJECT" \
+            --only hosting \
+            # --public "$PUBLIC_DIR" # firebase.jsonで指定したので不要な場合が多い
+            --expires 7d \
+            --debug
           fi
           echo "Firebase deployment command executed."
 
