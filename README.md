@@ -1,9 +1,14 @@
-# GitHub ActionsからFirebase App DistributionでUnityのAndroidビルドを配布するテストリポジトリ
+# GitHub ActionsからFirebaeを使ったAndroid/Webビルドを配布するテスト
+
+このRepositoryでは以下の内容を検証しています。
+* GitHub Actions + GameCIを使ったUnityのAndroid/Webビルド
+* Firebase App Distributionを使ったAndroidビルドの配布
+* Firebase Hostingを使ったWebビルドの配布
 
 ![](Docs/FAD-Release.png)
 
 # requirements
-* Unity 6000.0.38f1
+* Unity 6000.0.43f1
 
 # 解説記事
 
