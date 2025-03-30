@@ -224,7 +224,7 @@ jobs:
                   } ]
                 },
                 {
-                  "source": "**/*.wasm*",  # .wasm と .wasm.br/.wasm.gz 両方に対応する場合
+                  "source": "**/*.wasm*",
                   "headers": [ {
                     "key": "Content-Type",
                     "value": "application/wasm"
