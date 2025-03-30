@@ -167,20 +167,6 @@ jobs:
       - name: Deploy to Firebase Hosting using CLI
         if: github.event_name != 'pull_request'
         run: |
-          # --- デバッグ情報表示 ---
-          echo "--- Debug Info ---"
-          echo "GitHub Event Name: ${{ github.event_name }}"
-          echo "Target Branch/Ref: ${{ github.ref }}"
-          echo "Firebase Project ID from env: [${{ env.FIREBASE_PROJECT_ID }}]"
-          echo "Calculated Channel ID: ${{ env.CHANNEL_ID }}"
-          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
-            echo "Error: GCP_SA_KEY secret is not set or empty."
-            exit 1
-          else
-            echo "GCP_SA_KEY secret is set (length check)."
-          fi
-          echo "--- End Debug Info ---"
-
           # Firebase CLI インストール
           if ! command -v firebase &> /dev/null; then
               echo "Firebase CLI not found, installing..."
@@ -213,8 +199,7 @@ jobs:
           # ↓↓↓ ★★★ 公開ディレクトリのパスを修正 ★★★ ↓↓↓
           PUBLIC_DIR="build/WebGL/WebGL"
 
-          # firebase.json 作成 (public の値を修正後のパスにする)
-          echo "Creating temporary firebase.json..."
+          echo "Creating temporary firebase.json with headers..."
           echo '{
             "hosting": {
               "public": "'"$PUBLIC_DIR"'",
@@ -222,37 +207,35 @@ jobs:
                 "firebase.json",
                 "**/.*",
                 "**/node_modules/**"
+              ],
+              "headers": [
+                {
+                  "source": "**/*.@(js.br|wasm.br)",
+                  "headers": [ {
+                    "key": "Content-Encoding",
+                    "value": "br"
+                  } ]
+                },
+                {
+                  "source": "**/*.@(js.gz|wasm.gz)",
+                  "headers": [ {
+                    "key": "Content-Encoding",
+                    "value": "gzip"
+                  } ]
+                },
+                {
+                  "source": "**/*.wasm*",  # .wasm と .wasm.br/.wasm.gz 両方に対応する場合
+                  "headers": [ {
+                    "key": "Content-Type",
+                    "value": "application/wasm"
+                  } ]
+                }
               ]
             }
           }' > firebase.json
           echo "Generated firebase.json:"
           cat firebase.json
-
-          # ★ ビルド成果物ディレクトリの内容と index.html の存在を確認 (チェック対象のパスを修正) ★
-          echo "-----------------------------------------------------"
-          echo "Checking contents of public directory: $PUBLIC_DIR"
-          if [ -d "$PUBLIC_DIR" ]; then
-            ls -la "$PUBLIC_DIR"
-            # index.html ファイルの存在を確認
-            if [ -f "$PUBLIC_DIR/index.html" ]; then
-              echo "OK: index.html found in $PUBLIC_DIR."
-            else
-              echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-              echo "Error: index.html NOT found in public directory ($PUBLIC_DIR)!"
-              echo "Build output structure might be different than expected."
-              echo "Listing contents of 'build/WebGL/' directory:"
-              ls -la build/WebGL/ # 参考情報
-              echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-              exit 1
-            fi
-          else
-             echo "Error: Public directory '$PUBLIC_DIR' not found."
-             echo "Check 'Build WebGL App' step output structure."
-             ls -l build/WebGL/ # 参考情報
-             exit 1
-          fi
-          echo "-----------------------------------------------------"
-
+          
           echo "Deploying to project '$FIREBASE_PROJECT' on channel '$DEPLOY_CHANNEL'"
 
           # チャンネルに応じたデプロイコマンド (変更なし)
