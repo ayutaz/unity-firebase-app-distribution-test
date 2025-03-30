@@ -208,29 +208,6 @@ jobs:
                 "**/.*",
                 "**/node_modules/**"
               ],
-              "headers": [
-                {
-                  "source": "**/*.@(js.br|wasm.br)",
-                  "headers": [ {
-                    "key": "Content-Encoding",
-                    "value": "br"
-                  } ]
-                },
-                {
-                  "source": "**/*.@(js.gz|wasm.gz)",
-                  "headers": [ {
-                    "key": "Content-Encoding",
-                    "value": "gzip"
-                  } ]
-                },
-                {
-                  "source": "**/*.wasm*",
-                  "headers": [ {
-                    "key": "Content-Type",
-                    "value": "application/wasm"
-                  } ]
-                }
-              ]
             }
           }' > firebase.json
           echo "Generated firebase.json:"
