@@ -184,10 +184,10 @@ jobs:
       # Firebase Hostingにデプロイ（PRでない場合のみ）
       - name: Deploy to Firebase Hosting
         if: github.event_name != 'pull_request'
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: FirebaseExtended/action-hosting-deploy@v0.9.0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          firebaseServiceAccount: '${{ secrets.GCP_SA_KEY }}'
           projectId: ${{ env.FIREBASE_PROJECT_ID }}
           channelId: ${{ env.CHANNEL_ID }}
         env:
