@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  UNITY_VERSION: '6000.0.38f1'
+  UNITY_VERSION: '6000.0.43f1'
   FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
 
 jobs:
@@ -96,11 +96,9 @@ jobs:
             --groups "testers" \
             --release-notes "Release from GitHub Actions" \
 
-  # WebGL向けビルドとデプロイジョブ (修正箇所に ★ マーク)
   build-webgl:
     name: Build and Deploy WebGL
     runs-on: ubuntu-latest
-    # needs: build-android # 必要なら依存関係を設定
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
@@ -143,7 +141,7 @@ jobs:
         uses: actions/upload-artifact@v4.6.0
         with:
           name: Build-WebGL
-          path: build/WebGL # ★ ビルド出力先と合わせる
+          path: build/WebGL
           retention-days: 14
 
       # ブランチ名からチャンネルIDを生成（PRでない場合のみ）
@@ -237,18 +235,3 @@ jobs:
         env:
           FIREBASE_CLI_PREVIEWS: hostingchannels
           CI: true
-
-      # デプロイURL表示（PRでない場合のみ）
-      - name: Output Deploy URL
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "WebGL build deployment process finished for channel: ${{ env.CHANNEL_ID }}"
-          # channelId が 'live' の場合、本番URLを表示
-          # それ以外はプレビューチャンネルのURLを表示
-          if [[ "${{ env.CHANNEL_ID }}" == "live" ]]; then
-            echo "Production URL: https://${{ env.FIREBASE_PROJECT_ID }}.web.app"
-            echo "Production URL (firebaseapp.com): https://${{ env.FIREBASE_PROJECT_ID }}.firebaseapp.com"
-          else
-            echo "Preview URL: https://${{ env.FIREBASE_PROJECT_ID }}--${{ env.CHANNEL_ID }}.web.app"
-            echo "Preview URL (firebaseapp.com): https://${{ env.FIREBASE_PROJECT_ID }}--${{ env.CHANNEL_ID }}.firebaseapp.com"
-          fi
