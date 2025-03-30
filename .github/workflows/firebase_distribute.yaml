@@ -205,7 +205,7 @@ jobs:
                 "firebase.json",
                 "**/.*",
                 "**/node_modules/**"
-              ],
+              ]
             }
           }' > firebase.json
           echo "Generated firebase.json:"
