@@ -1,4 +1,4 @@
-# GitHub ActionsからFirebaeを使ったAndroid/Webビルドを配布するテスト
+# GitHub ActionsからFirebaseを使ったAndroid/Webビルドを配布するテスト
 
 このRepositoryでは以下の内容を検証しています。
 * GitHub Actions + GameCIを使ったUnityのAndroid/Webビルド
