@@ -390,3 +390,37 @@ jobs:
             echo "::error::IPA file not found!"
             exit 1
           fi
+
+      # Firebase App Distributionへのデプロイ（PRでない場合のみ）
+      - name: Deploy to Firebase App Distribution
+        if: github.event_name != 'pull_request'
+        run: |
+          # Firebase CLI インストール (存在しない場合)
+          if ! command -v firebase &> /dev/null; then
+            echo "Firebase CLI not found, installing..."
+            curl -sL https://firebase.tools | bash
+          fi
+          firebase --version
+
+          # サービスアカウントキー処理
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account_ios.json
+          JSON_SIZE=$(stat -f%z service_account_ios.json) # macOS 用の stat コマンドオプション
+          echo "iOS Service Account JSON size: $JSON_SIZE bytes"
+          if [ "$JSON_SIZE" -lt 100 ]; then
+            echo "Error: Failed to create valid iOS service account file."
+            cat service_account_ios.json
+            exit 1
+          fi
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service_account_ios.json"
+
+          # Firebase App Distribution へ配布
+          echo "Distributing IPA to Firebase: ${{ env.IPA_PATH }}"
+          firebase appdistribution:distribute "${{ env.IPA_PATH }}" \
+            --app ${{ secrets.FIREBASE_IOS_APP_ID }} \
+            --groups "testers" \
+            --release-notes "iOS Release from GitHub Actions (${{ github.run_number }})" \
+            --debug
+
+        env:
+          # FIREBASE_IOS_APP_ID を Secrets に設定する必要があります
+          CI: true
