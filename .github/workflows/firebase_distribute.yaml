@@ -417,16 +417,32 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/service_account_ios.json" >> $GITHUB_ENV
           echo "Service account setup complete."
 
-      - name: Deploy iOS App to Firebase App Distribution
+      - name: Deploy iOS App to Firebase App Distribution using gcloud
         if: github.event_name != 'pull_request'
         # GOOGLE_APPLICATION_CREDENTIALS は前のステップで $GITHUB_ENV 経由で設定される
         run: |
-          echo "Distributing IPA to Firebase: ${{ env.IPA_PATH }}"
-          firebase appdistribution:distribute "${{ env.IPA_PATH }}" \\
-            --app ${{ secrets.FIREBASE_IOS_APP_ID }} \\
-            --groups "testers" \\
-            --release-notes "iOS Release from GitHub Actions (${{ github.run_number }})" \\
-            --debug
+          # gcloud が存在するか確認し、なければインストール（通常macOSには含まれる）
+          if ! command -v gcloud &> /dev/null; then
+            echo "gcloud not found, attempting to install Google Cloud SDK..."
+            # Google Cloud SDK のインストール手順 (macOS)
+            # 必要に応じて、より堅牢なインストール方法に変更してください
+            curl https://sdk.cloud.google.com | bash -s -- --disable-prompts --install-component=firebase > /dev/null 2>&1
+            source "$HOME/google-cloud-sdk/path.bash.inc"
+            gcloud --version
+          else
+            echo "gcloud found:"
+            gcloud --version
+          fi
+
+          echo "Distributing IPA to Firebase using gcloud: ${{ env.IPA_PATH }}"
+
+          # gcloud コマンドで配布を試行
+          gcloud firebase appdistribution apps distribute "${{ env.IPA_PATH }}" \
+            --app "${{ secrets.FIREBASE_IOS_APP_ID }}" \
+            --groups "testers" \
+            --release-notes "iOS Release from GitHub Actions (${{ github.run_number }}) [gcloud]"
+
+          echo "gcloud distribution command executed."
         env:
           # FIREBASE_IOS_APP_ID を Secrets に設定する必要があります
           CI: true
