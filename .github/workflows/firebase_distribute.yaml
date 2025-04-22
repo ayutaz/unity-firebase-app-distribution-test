@@ -401,42 +401,30 @@ jobs:
           fi
           firebase --version
 
-      - name: Setup Service Account (iOS)
+      # Google Cloud SDK のセットアップと認証
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
         if: github.event_name != 'pull_request'
-        run: |
-          echo "Setting up service account for iOS distribution..."
-          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account_ios.json
-          JSON_SIZE=$(stat -f%z service_account_ios.json) # macOS 用の stat コマンドオプション
-          echo "iOS Service Account JSON size: $JSON_SIZE bytes"
-          if [ "$JSON_SIZE" -lt 100 ]; then
-            echo "::error::Failed to create valid iOS service account file."
-            cat service_account_ios.json
-            exit 1
-          fi
-          # Export variable for subsequent steps in the job
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/service_account_ios.json" >> $GITHUB_ENV
-          echo "Service account setup complete."
+        with:
+          # サービスアカウントキーを直接使用
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          # エクスポートする設定 (オプションですが、プロジェクトIDを指定しておくと便利)
+          export_default_credentials: true
+          project_id: ${{ secrets.FIREBASE_PROJECT_ID }} # プロジェクトIDもSecretに入れるか、envから参照
 
+      # gcloud を使用して Firebase App Distribution へデプロイ
       - name: Deploy iOS App to Firebase App Distribution using gcloud
         if: github.event_name != 'pull_request'
-        # GOOGLE_APPLICATION_CREDENTIALS は前のステップで $GITHUB_ENV 経由で設定される
         run: |
-          # gcloud が存在するか確認し、なければインストール（通常macOSには含まれる）
-          if ! command -v gcloud &> /dev/null; then
-            echo "gcloud not found, attempting to install Google Cloud SDK..."
-            # Google Cloud SDK のインストール手順 (macOS)
-            # 必要に応じて、より堅牢なインストール方法に変更してください
-            curl https://sdk.cloud.google.com | bash -s -- --disable-prompts --install-component=firebase > /dev/null 2>&1
-            source "$HOME/google-cloud-sdk/path.bash.inc"
-            gcloud --version
-          else
-            echo "gcloud found:"
-            gcloud --version
-          fi
+          echo "gcloud version:"
+          gcloud --version
+
+          echo "Firebase projects list (checking authentication):"
+          gcloud projects list # 認証確認のためにプロジェクト一覧を表示
 
           echo "Distributing IPA to Firebase using gcloud: ${{ env.IPA_PATH }}"
 
-          # gcloud コマンドで配布を試行
+          # gcloud コマンドで配布を試行 (認証は setup-gcloud で完了済み)
           gcloud firebase appdistribution apps distribute "${{ env.IPA_PATH }}" \
             --app "${{ secrets.FIREBASE_IOS_APP_ID }}" \
             --groups "testers" \
