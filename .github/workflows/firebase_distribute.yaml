@@ -61,7 +61,6 @@ jobs:
           name: Build-Android
           path: build/Android/MyAndroidApp.apk
 
-      # Firebase App Distributionへのデプロイ（PRでない場合のみ）
       - name: Deploy to Firebase App Distribution
         if: github.event_name != 'pull_request'
         run: |
@@ -391,6 +390,19 @@ jobs:
             exit 1
           fi
 
+      - name: Deploy to Firebase App Distribution
+        if: github.event_name != 'pull_request'
+        run: |
+          # Google Cloud SDKのインストール
+          sudo apt-get update
+          sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+            | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+            | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-sdk
+
       # --- Firebase App Distribution Deployment Steps (iOS) ---
       - name: Install Firebase CLI (iOS)
         if: github.event_name != 'pull_request'
@@ -401,36 +413,18 @@ jobs:
           fi
           firebase --version
 
-      # Google Cloud SDK のセットアップと認証
-      - name: Setup Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        if: github.event_name != 'pull_request'
-        with:
-          # サービスアカウントキーを直接使用
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          # エクスポートする設定 (オプションですが、プロジェクトIDを指定しておくと便利)
-          export_default_credentials: true
-          project_id: ${{ secrets.FIREBASE_PROJECT_ID }} # プロジェクトIDもSecretに入れるか、envから参照
-
-      # gcloud を使用して Firebase App Distribution へデプロイ
-      - name: Deploy iOS App to Firebase App Distribution using gcloud
-        if: github.event_name != 'pull_request'
+      - name: Setup Service Account & Distribute
         run: |
-          echo "gcloud version:"
-          gcloud --version
-
-          echo "Firebase projects list (checking authentication):"
-          gcloud projects list # 認証確認のためにプロジェクト一覧を表示
-
-          echo "Distributing IPA to Firebase using gcloud: ${{ env.IPA_PATH }}"
-
-          # gcloud コマンドで配布を試行 (認証は setup-gcloud で完了済み)
-          gcloud firebase appdistribution apps distribute "${{ env.IPA_PATH }}" \
+          # 1) JSON を復元
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account.json
+          echo "Service Account JSON size: $(stat -c %s service_account.json) bytes"
+          
+          # 2) 変数をエクスポート (これでこのステップのシェルで認識される)
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service_account.json"
+          
+          firebase appdistribution:distribute "${{ env.IPA_PATH }}" \
             --app "${{ secrets.FIREBASE_IOS_APP_ID }}" \
             --groups "testers" \
-            --release-notes "iOS Release from GitHub Actions (${{ github.run_number }}) [gcloud]"
+            --release-notes "iOS Release from GitHub Actions (${{ github.run_number }}) [gcloud]" \
 
           echo "gcloud distribution command executed."
-        env:
-          # FIREBASE_IOS_APP_ID を Secrets に設定する必要があります
-          CI: true
