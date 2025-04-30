@@ -404,7 +404,7 @@ jobs:
         run: |
           # 1) JSON を復元
           echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > service_account.json
-          echo "Service Account JSON size: $(stat -c %s service_account.json) bytes"
+          echo "Service Account JSON size: $(stat -f %z service_account.json) bytes"
           
           # 2) 変数をエクスポート (これでこのステップのシェルで認識される)
           export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service_account.json"
