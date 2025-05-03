@@ -235,7 +235,7 @@ jobs:
           FIREBASE_CLI_PREVIEWS: hostingchannels
           CI: true
 
-build-ios:
+  build-ios:
     name: Build and Deploy iOS
     runs-on: macos-latest
     steps:
